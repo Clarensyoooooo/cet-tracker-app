@@ -21,6 +21,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { GraduationCap, Plus, Pencil, Trash2, ArrowLeft, Loader2, Save, X } from "lucide-react"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
+import { Textarea } from "@/components/ui/textarea" 
+import { Sparkles } from "lucide-react" // Import the icon
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
@@ -48,6 +50,34 @@ export default function AdminPage() {
   const [formData, setFormData] = useState(defaultFormData)
   const [isSaving, setIsSaving] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+
+  const [rawText, setRawText] = useState("")
+const [isParsing, setIsParsing] = useState(false)
+
+const handleMagicFill = async () => {
+  if (!rawText) return
+  setIsParsing(true)
+  try {
+    const res = await fetch("/api/admin/parse-announcement", {
+      method: "POST",
+      body: JSON.stringify({ text: rawText }),
+    })
+    const data = await res.json()
+    
+    // Merge AI data with existing form data
+    setFormData(prev => ({
+      ...prev,
+      ...data,
+      // Ensure arrays are handled safely
+      exam_dates: data.exam_dates || prev.exam_dates,
+      requirements: data.requirements || prev.requirements,
+    }))
+  } catch (error) {
+    console.error("AI Parse failed", error)
+  } finally {
+    setIsParsing(false)
+  }
+}
 
   const resetForm = () => {
     setFormData(defaultFormData)
@@ -203,6 +233,39 @@ export default function AdminPage() {
                       : "Fill in the details for the new university."}
                   </DialogDescription>
                 </DialogHeader>
+
+                {/* --- START MAGIC FILL UI --- */}
+  <div className="bg-muted/50 p-4 rounded-lg my-4 border border-dashed">
+    <Label className="flex items-center gap-2 mb-2 text-primary">
+      <Sparkles className="w-4 h-4 text-yellow-500" />
+      AI Magic Fill
+    </Label>
+    <Textarea 
+      placeholder="Paste announcement text here (e.g. 'UPCAT applications open on Aug 1...')"
+      value={rawText}
+      onChange={(e) => setRawText(e.target.value)}
+      className="mb-2 text-xs min-h-[80px]"
+    />
+    <Button 
+      type="button" 
+      size="sm" 
+      onClick={handleMagicFill} 
+      disabled={isParsing || !rawText}
+      className="w-full"
+      variant="secondary"
+    >
+      {isParsing ? (
+        <>
+          <Loader2 className="w-3 h-3 animate-spin mr-2"/> Parsing...
+        </>
+      ) : (
+        <>
+          <Sparkles className="w-3 h-3 mr-2" /> Auto-fill Form
+        </>
+      )}
+    </Button>
+  </div>
+  {/* --- END MAGIC FILL UI --- */}
 
                 <div className="grid gap-4 py-4">
                   <div className="grid grid-cols-2 gap-4">
