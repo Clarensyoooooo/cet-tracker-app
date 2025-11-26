@@ -23,6 +23,9 @@ import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { Textarea } from "@/components/ui/textarea" 
 import { Sparkles } from "lucide-react" // Import the icon
+import { useRouter } from "next/navigation"
+import { createClient } from "@/lib/supabase/client"
+import { LogOut } from "lucide-react"
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
@@ -50,6 +53,14 @@ export default function AdminPage() {
   const [formData, setFormData] = useState(defaultFormData)
   const [isSaving, setIsSaving] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const router = useRouter()
+const supabase = createClient()
+
+const handleLogout = async () => {
+  await supabase.auth.signOut()
+  router.push("/login")
+  router.refresh()
+}
 
   const [rawText, setRawText] = useState("")
 const [isParsing, setIsParsing] = useState(false)
@@ -200,15 +211,22 @@ const handleMagicFill = async () => {
               <Link href="/" className="text-muted-foreground hover:text-foreground transition-colors">
                 <ArrowLeft className="h-5 w-5" />
               </Link>
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
-                  <GraduationCap className="h-5 w-5 text-primary-foreground" />
-                </div>
-                <div>
-                  <h1 className="text-lg font-semibold text-foreground">Admin Dashboard</h1>
-                  <p className="text-xs text-muted-foreground">Manage University Data</p>
-                </div>
-              </div>
+             <div className="flex items-center justify-between w-full">
+  <div className="flex items-center gap-3">
+    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
+      <GraduationCap className="h-5 w-5 text-primary-foreground" />
+    </div>
+    <div>
+      <h1 className="text-lg font-semibold text-foreground">Admin Dashboard</h1>
+      <p className="text-xs text-muted-foreground">Manage University Data</p>
+    </div>
+  </div>
+
+  <Button variant="ghost" size="sm" onClick={handleLogout} className="text-muted-foreground hover:text-destructive">
+    <LogOut className="mr-2 h-4 w-4" />
+    Sign Out
+  </Button>
+</div>
             </div>
 
             <Dialog
