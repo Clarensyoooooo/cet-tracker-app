@@ -14,8 +14,9 @@ export async function POST(request: Request) {
   try {
     // 2. Initialize Gemini
     const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || "")
-    // 'gemini-1.5-flash' is fast, cheap/free, and good at extraction
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" })
+    
+    // UPDATE: Use a specific version tag to avoid 404s
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" })
 
     // 3. Get Data
     const body = await request.json()
@@ -48,8 +49,6 @@ export async function POST(request: Request) {
     let result;
     if (image) {
       // Handle Image (Base64)
-      // The frontend likely sends "data:image/png;base64,..."
-      // Gemini expects just the base64 string and the mime type
       const base64Data = image.split(",")[1]
       const mimeType = image.split(":")[1].split(";")[0]
       
