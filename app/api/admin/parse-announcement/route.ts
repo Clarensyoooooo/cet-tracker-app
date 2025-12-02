@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import OpenAI from "openai"
+import { GoogleGenerativeAI } from "@google/generative-ai"
 import { createClient } from "@/lib/supabase/server"
 
 export async function POST(request: Request) {
@@ -12,12 +12,12 @@ export async function POST(request: Request) {
   }
 
   try {
-    // 2. Initialize OpenAI inside the function (Prevents build crashes if key is missing)
-    const openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-    })
+    // 2. Initialize Gemini
+    const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || "")
+    // 'gemini-1.5-flash' is fast, cheap/free, and good at extraction
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" })
 
-    // 3. Get Data (Handle both Text or Image inputs)
+    // 3. Get Data
     const body = await request.json()
     const { image, text } = body
 
@@ -25,39 +25,49 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "No input provided" }, { status: 400 })
     }
 
-    // 4. Build the AI Prompt
-    const userMessageContent: any[] = [
-      { 
-        type: "text", 
-        text: "Extract university admission details into this JSON structure: { application_start, application_end, exam_dates: [{date, note}], results_release, exam_fee, requirements: [] }. Use null for missing info." 
+    // 4. Build the Prompt
+    const prompt = `
+      You are a data extraction assistant for a university application tracker.
+      Extract the following details from the provided text or image.
+      Return ONLY a valid JSON object. Do not use Markdown formatting (no \`\`\`json).
+      
+      JSON Structure:
+      {
+        "application_start": "string or null",
+        "application_end": "string or null",
+        "exam_dates": [{ "date": "string", "note": "string" }],
+        "results_release": "string or null",
+        "exam_fee": "string or null",
+        "requirements": ["string"]
       }
-    ]
 
+      If information is missing, use null.
+    `
+
+    // 5. Generate Content
+    let result;
     if (image) {
-      userMessageContent.push({
-        type: "image_url",
-        image_url: { url: image }
-      })
-    } else if (text) {
-      userMessageContent.push({
-        type: "text",
-        text: `\n\nAnalyze this text: ${text}`
-      })
+      // Handle Image (Base64)
+      // The frontend likely sends "data:image/png;base64,..."
+      // Gemini expects just the base64 string and the mime type
+      const base64Data = image.split(",")[1]
+      const mimeType = image.split(":")[1].split(";")[0]
+      
+      result = await model.generateContent([
+        prompt,
+        { inlineData: { data: base64Data, mimeType: mimeType } }
+      ])
+    } else {
+      // Handle Text
+      result = await model.generateContent([prompt, text])
     }
 
-    // 5. Call OpenAI
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o", // Use gpt-4o for best image/text understanding
-      messages: [
-        {
-          role: "user",
-          content: userMessageContent,
-        },
-      ],
-      response_format: { type: "json_object" },
-    })
+    const responseText = result.response.text()
+    
+    // Clean up potential markdown formatting if the model adds it
+    const cleanJson = responseText.replace(/```json|```/g, "").trim()
+    const data = JSON.parse(cleanJson)
 
-    const data = JSON.parse(response.choices[0].message.content || "{}")
     return NextResponse.json(data)
 
   } catch (error) {
